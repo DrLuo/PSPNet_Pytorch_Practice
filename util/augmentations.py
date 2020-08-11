@@ -53,8 +53,18 @@ class ToTensor(object):
         return image, label
 
 
-class Normalize(object):
+class ToNumpy(object):
+    # Convert torch.FloatTensor (C x H x W) to numpy.ndarray (H x W x C)
+    def __call__(self, img, label):
+        img = img.numpy()
+        img = img.transpose((1,2,0))
+        label = label.numpy
+        return img, label
 
+
+
+class Normalize(object):
+    # Normalize tensor with mean and standard deviation along channel: channel = (channel - mean) / std
     def __init__(self, mean, std=None):
         if std is None:
             assert len(mean) > 0
@@ -63,7 +73,7 @@ class Normalize(object):
         self.mean = mean
         self.std = std
 
-    def __call__(self, image, label):
+    def __call__(self, image, label):   # Input in Tensor form
         if self.std is None:
             for t, m in zip(image, self.mean):
                 t.sub_(m)   # 减去均值
@@ -116,8 +126,8 @@ class RandomResize(object):
             temp_aspect_ratio = math.sqrt(temp_aspect_ratio)
         scale_factor_w = temp_size * temp_aspect_ratio
         scale_factor_h = temp_size / temp_aspect_ratio
-        image = cv2.resize(image, fx=scale_factor_w, fy=scale_factor_h, interpolation='INTER_LINEAR')
-        label = cv2.resize(label, fx=scale_factor_w, fy=scale_factor_h, interpolation='INTER_NEAREST')
+        image = cv2.resize(image, None, fx=scale_factor_w, fy=scale_factor_h, interpolation=cv2.INTER_LINEAR)
+        label = cv2.resize(label, None, fx=scale_factor_w, fy=scale_factor_h, interpolation=cv2.INTER_NEAREST)
         return image, label
 
 

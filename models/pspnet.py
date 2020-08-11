@@ -11,6 +11,8 @@ PSPnet model
 '''
 pyramid pooling module
 last feature map + 4*(pooling + 1*1conv)
+when using ResNet 18/34 : psp_dim = 512 , mid_dim = 256
+when using ResNet 50+ :   psp_size = 2048 , mid_dim = 1024
 '''
 class PPM(nn.Module):
     def __init__(self, in_dim, out_dim, bins):
@@ -47,8 +49,9 @@ class PSPNet(nn.Module):
         self.zoom_factor = zoom_factor
 
         # backbone ResNet
-        fea_dim = 2048      #ResNet输出map维度
-        mid_dim = 1024
+        fea_dim = 2048      # ResNet输出map维度，用于后续PSP module
+        mid_dim = 1024      # Resnet block4 输出的feature map维度，用于训练时的aux loss
+
         if layers == 18:
             resnet = models.resnet18()
             fea_dim = 512
@@ -90,7 +93,7 @@ class PSPNet(nn.Module):
         self.final = nn.Sequential(
             nn.Conv2d(2*fea_dim, 512, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(512),
-            nn.ReLU(),
+            nn.ReLU(True),
             nn.Dropout(p=dropout),
             nn.Conv2d(512, nclass, kernel_size=1)
         )
@@ -107,7 +110,8 @@ class PSPNet(nn.Module):
 
     def foward(self, x):
         x_size = x.size()
-        assert  (x_size[2]-1) % 8 == 0
+        # zoom factor = 8
+        assert  x_size[2] % 8 == 0 and x_size[3] % 8 == 0
         h = x_size[2]
         w = x_size[3]
 

@@ -9,7 +9,10 @@ import os
 import sys
 import time
 
-from data import *
+from data import pascal_voc
+from models import pspnet
+from util import augmentations as aug
+from config.config import cfg
 
 from tensorboardX import SummaryWriter
 
@@ -22,6 +25,9 @@ parser = argparse.ArgumentParser(
 train_set = parser.add_mutually_exclusive_group()
 parser.add_argument('--dataset', default='VOC', choices=['VOC', 'ADE20K'],
                     type=str, help='VOC or ADE20K')
+# TODO: Confirm the data dir
+parser.add_argument('--data_dir', default='VOC2012',
+                    help='the Root Dir of your dataset')
 parser.add_argument('--basenet', default='vgg16_reducedfc.pth',
                     help='Pretrained base model')
 parser.add_argument('--batch_size', default=4, type=int,
@@ -65,20 +71,44 @@ if not os.path.exists(args.save_folder):
 
 def train():
 
+    value_scale = 255
+    mean = cfg['mean']
+    std = cfg['cfg']
+    mean = [item * value_scale for item in mean]
+    std = [item * value_scale for item in std]
+
     if args.dataset == 'VOC':
-        dataset = VOCDataset
+        transform = aug.Compose([
+            aug.RandomResize([cfg['resize_min'], cfg['resize_max']]),
+            aug.RandomRotate([cfg['rotate_min'], cfg['rotate_max']]),
+            aug.RandomGaussianBlur(),
+            aug.RandomHorizontalFlip(),
+            aug.Crop([cfg['train_h'], cfg['train_w']], crop_type='rand', padding=mean),
+            aug.ToTensor(),
+            aug.Normalize()
+        ])
+        dataset = pascal_voc.VOCDataset(split='train', data_dir=args.data_dir, transform=transform)
     elif args.dataset == 'ADE20K':
         print("Currently only support VOC")
         return 0
 
-    net =
+    net = pspnet.PSPNet(layers=cfg['layers'], nclass=cfg['num_class'], bins=cfg['bins'], zoom_factor=cfg['zoom_factor'])
+    nn.CrossEntropyLoss(ignore_index=cfg['ignore_label'])
+
+    net.train()
 
 
 
-    criterion =
+    #criterion =
 
+
+'''
+def validation():
+    if
+'''
 
 
 if __name__ == "__main__":
 
     print('resnet50')
+    print(args.data_dir)
