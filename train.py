@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.utils.data as data
 import torch.backends.cudnn as cudnn
 import argparse
 
@@ -76,6 +77,7 @@ def train():
     std = cfg['cfg']
     mean = [item * value_scale for item in mean]
     std = [item * value_scale for item in std]
+    max_iter = cfg['max_iter']
 
     if args.dataset == 'VOC':
         transform = aug.Compose([
@@ -93,19 +95,88 @@ def train():
         return 0
 
     net = pspnet.PSPNet(layers=cfg['layers'], nclass=cfg['num_class'], bins=cfg['bins'], zoom_factor=cfg['zoom_factor'])
-    nn.CrossEntropyLoss(ignore_index=cfg['ignore_label'])
+
+    if args.cuda:
+        net = torch.nn.DataParallel(net)
+        cudnn.benchmark = True
+
+    if args.resume:
+        print('Resuming training, loading {} ...'.format(args.resume))
+        net.load_weights(args.resume)
+    else:
+        base_weights = torc
+
+    optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    criterion = nn.CrossEntropyLoss(ignore_index=cfg['ignore_label'])
 
     net.train()
 
+    #loss counters
+    main_loss = 0
+    aux_loss = 0
+    epoch = 0
+    print("Loading the dataset...")
+
+    epoch_size = len(dataset) // args.batch_size
+    print('Train PSPnet on : ', args.dataset)
+    print('Epoch size is ', epoch_size)
+
+    step_index = 0
+
+    # 可视化
 
 
-    #criterion =
+    # load data
+    data_loader = data.DataLoader(dataset, args.batch_size,
+                                  num_workers=args.num_workers,
+                                  shuffle=True, pin_memory=True,
+                                  drop_last=True)
+    t0 = time.time()
+
+    # create batch iterator
+    batch_iterator = iter(data_loader)
+    for iteration in range(args.start_iter, max_iter):
+        if iteration != 0 and (iteration % epoch_size == 0):
+                        # reset epoch loss counters
+            main_loss = 0
+            aux_loss = 0
+            epoch += 1
+            batch_iterator = iter(data_loader)
+
+        poly_learning_rate(optimizer, args.power, iteration, max_iter)
+
+        try:
+            images, targets = next(batch_iterator)
+        except StopIteration:
+            batch_iterator = iter(data_loader)
+            images, label = next(batch_iterator)
+
+        if args.cuda:
+            images = images.cuda()
+            label = label.cuda()
+
+        # forward
+        out, aux = net(images)
+        # backprop
+        optimizer.zero_grad()
+        main_loss = criterion(out, label)
+        aux_loss = criterion(aux, label)
+
+
+    #criterion = nn.CrossEntropyLoss()
+
 
 
 '''
 def validation():
     if
 '''
+
+def poly_learning_rate(optimizer, power, iter, max_iter):
+    lr = args.lr * ((1 - (iter/max_iter)) ** power)
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+    #return lr
 
 
 if __name__ == "__main__":
