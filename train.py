@@ -104,7 +104,9 @@ def train():
         print('Resuming training, loading {} ...'.format(args.resume))
         net.load_weights(args.resume)
     else:
-        base_weights = torc
+        base_weights = torch.load(args.save_folder + args.basenet)
+        print('Loading base network...')
+        net.vgg.load_state_dict(base_weights)
 
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss(ignore_index=cfg['ignore_label'])
@@ -161,9 +163,22 @@ def train():
         optimizer.zero_grad()
         main_loss = criterion(out, label)
         aux_loss = criterion(aux, label)
+        loss = main_loss + cfg['aux_weight'] * aux_loss
+        loss.backward()
+        optimizer.step()
+
+        if iteration % 10 == 0:
+            print('timer: %.4f sec.' % (time.time() - t0))
+            print('iter' + repr(iteration) + ' || Loss: %.4f ||' % (loss.item()), end=' ')
+            t0 = time.time()
+
+        if iteration != 0 and iteration % 5000 == 0:
+            print('Saving state, iter:', iteration)
+            torch.save(net.state_dict(), os.path.join(args.save_folder, 'PSPNet_' + repr(iteration // 1000) + 'K.pth' ))
 
 
-    #criterion = nn.CrossEntropyLoss()
+    torch.save(net.state_dict(), os.path.join(args.save_folder, 'PSPNet_' + args.dataset + '.pth'))
+
 
 
 
@@ -179,7 +194,25 @@ def poly_learning_rate(optimizer, power, iter, max_iter):
     #return lr
 
 
+def xavier(param):
+    nn.init.xavier_uniform_(param)
+
+
+def weights_init(m):
+    if isinstance(m, nn.Conv2d):
+        xavier(m.weight.data)
+        m.bias.data.zero_()
+
+
 if __name__ == "__main__":
 
-    print('resnet50')
+    train()
+    '''
+    print(args.lr)
     print(args.data_dir)
+    print(args.basenet)
+    print(args.dataset)
+    iteration = 30000
+    print(os.path.join(args.save_folder, 'PSPNet_' + repr(iteration // 1000) + 'K.pth' ))
+    print(os.path.join(args.save_folder, 'PSPNet_' + args.dataset + '.pth'))
+    '''
