@@ -14,6 +14,7 @@ from data import pascal_voc
 from models import pspnet
 from util import augmentations as aug
 from config.config import cfg
+from util.utils import intersectionAndUnionGPU
 
 from tensorboardX import SummaryWriter
 
@@ -49,8 +50,8 @@ parser.add_argument('--weight_decay', default=1e-4, type=float,
                     help='Weight decay for SGD')
 parser.add_argument('--power', default=0.9, type=float,
                     help='power for poly learing policy')
-parser.add_argument('--visdom', default=True, type=str2bool,
-                    help='Use visdom for loss visualization')
+parser.add_argument('--validation', default=True, type=str2bool,
+                    help='Validate in training process')
 parser.add_argument('--save_folder', default='weights/',
                     help='Directory for saving checkpoint models')
 args = parser.parse_args()
@@ -79,13 +80,14 @@ def train():
     std = [item * value_scale for item in std]
     max_iter = cfg['max_iter']
 
+    # Prepare The data
     if args.dataset == 'VOC':
         transform = aug.Compose([
             aug.RandomResize([cfg['resize_min'], cfg['resize_max']]),
             aug.RandomRotate([cfg['rotate_min'], cfg['rotate_max']]),
             aug.RandomGaussianBlur(),
             aug.RandomHorizontalFlip(),
-            aug.Crop([cfg['train_h'], cfg['train_w']], crop_type='rand', padding=mean),
+            aug.Crop([cfg['train_h'], cfg['train_w']], crop_type='rand', padding=mean, ignore_label=cfg['ignore_label']),
             aug.ToTensor(),
             aug.Normalize()
         ])
@@ -93,6 +95,15 @@ def train():
     elif args.dataset == 'ADE20K':
         print("Currently only support VOC")
         return 0
+
+    if args.validation:
+        val_transform = aug.Compose([
+            aug.Crop([cfg['train_h'], cfg['train_w']], crop_type='center', padding=mean, ignore_label=cfg['ignore_label']),
+            aug.ToTensor(),
+            aug.Normalize()
+        ])
+        val_data = pascal_voc.VOCDataset(split='val', data_dir=args.data_dir, transform=val_transform)
+
 
     net = pspnet.PSPNet(layers=cfg['layers'], nclass=cfg['num_class'], bins=cfg['bins'], zoom_factor=cfg['zoom_factor'])
 
@@ -106,7 +117,7 @@ def train():
     else:
         base_weights = torch.load(args.save_folder + args.basenet)
         print('Loading base network...')
-        net.vgg.load_state_dict(base_weights)
+        net.load_state_dict(base_weights)
 
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss(ignore_index=cfg['ignore_label'])
@@ -133,6 +144,9 @@ def train():
                                   num_workers=args.num_workers,
                                   shuffle=True, pin_memory=True,
                                   drop_last=True)
+    val_loader = data.DataLoader(val_data, cfg['batch_size_val'],
+                                 num_workers=args.num_workers,
+                                 shuffle=False, pin_memory=True)
     t0 = time.time()
 
     # create batch iterator
@@ -144,6 +158,7 @@ def train():
             aux_loss = 0
             epoch += 1
             batch_iterator = iter(data_loader)
+            validation(net, val_loader, criterion)
 
         poly_learning_rate(optimizer, args.power, iteration, max_iter)
 
@@ -182,10 +197,15 @@ def train():
 
 
 
-'''
-def validation():
-    if
-'''
+
+def validation(model, val_loader, criterion):
+    #if main_process():
+
+    model.eval()
+    end = time.time()
+
+
+
 
 def poly_learning_rate(optimizer, power, iter, max_iter):
     lr = args.lr * ((1 - (iter/max_iter)) ** power)
