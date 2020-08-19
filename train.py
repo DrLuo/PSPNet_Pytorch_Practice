@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as data
 import torch.backends.cudnn as cudnn
+import torch.nn.functional as F
 import argparse
 
 import numpy as np
@@ -27,10 +28,10 @@ parser = argparse.ArgumentParser(
 train_set = parser.add_mutually_exclusive_group()
 parser.add_argument('--dataset', default='VOC', choices=['VOC', 'ADE20K'],
                     type=str, help='VOC or ADE20K')
-# TODO: Confirm the data dir
+# TODO: Confirm the data dir and basenet
 parser.add_argument('--data_dir', default='VOC2012',
                     help='the Root Dir of your dataset')
-parser.add_argument('--basenet', default='vgg16_reducedfc.pth',
+parser.add_argument('--basenet', default='',
                     help='Pretrained base model')
 parser.add_argument('--batch_size', default=4, type=int,
                     help='Batch size for training')
@@ -203,6 +204,24 @@ def validation(model, val_loader, criterion):
 
     model.eval()
     end = time.time()
+
+    for i, (input, target) in enumerate(val_loader):
+
+        input = input.cuda(non_blocking=True)
+        target = target.cuda(non_blocking=True)
+        output = model(input)
+        if cfg['zoom_factor'] != 8:
+            output = F.interpolate(output, size=target.size()[1:], mode='bilinear', align_corners=True)
+
+        loss = criterion(output, target)
+        n = input.size(0)
+
+
+        seg = output.max(1)[1]
+        intersection, union, target = intersectionAndUnionGPU(output, target, cfg['num_class'], cfg['ignore_label'])
+        intersection, union, target = intersection.cpu().numpy(), union.cpu().numpy(), target.cpu().numpy()
+
+
 
 
 
