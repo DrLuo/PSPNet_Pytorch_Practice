@@ -29,9 +29,9 @@ train_set = parser.add_mutually_exclusive_group()
 parser.add_argument('--dataset', default='VOC', choices=['VOC', 'ADE20K'],
                     type=str, help='VOC or ADE20K')
 # TODO: Confirm the data dir and basenet
-parser.add_argument('--data_dir', default='VOC2012',
+parser.add_argument('--data_dir', default='E:\Code\VOC2012',
                     help='the Root Dir of your dataset')
-parser.add_argument('--basenet', default='',
+parser.add_argument('--basenet', default='E:/Code/pretrainedmodel/resnet/resnet50-19c8e357.pth',
                     help='Pretrained base model')
 parser.add_argument('--batch_size', default=4, type=int,
                     help='Batch size for training')
@@ -76,7 +76,7 @@ def train():
 
     value_scale = 255
     mean = cfg['mean']
-    std = cfg['cfg']
+    std = cfg['std']
     mean = [item * value_scale for item in mean]
     std = [item * value_scale for item in std]
     max_iter = cfg['max_iter']
@@ -85,10 +85,10 @@ def train():
     if args.dataset == 'VOC':
         transform = aug.Compose([
             aug.RandomResize([cfg['resize_min'], cfg['resize_max']]),
-            aug.RandomRotate([cfg['rotate_min'], cfg['rotate_max']]),
+            aug.RandomRotate([cfg['rotate_min'], cfg['rotate_max']], padding=mean, ignore_label=cfg['ignore_label']),
             aug.RandomGaussianBlur(),
             aug.RandomHorizontalFlip(),
-            aug.Crop([cfg['train_h'], cfg['train_w']], crop_type='rand', padding=mean, ignore_label=cfg['ignore_label']),
+            aug.Crop([cfg['train_h'], cfg['train_w']], crop_type='random', padding=mean, ignore_label=cfg['ignore_label']),
             aug.ToTensor(),
             aug.Normalize(mean=mean, std=std)
         ])
@@ -101,31 +101,42 @@ def train():
         val_transform = aug.Compose([
             aug.Crop([cfg['train_h'], cfg['train_w']], crop_type='center', padding=mean, ignore_label=cfg['ignore_label']),
             aug.ToTensor(),
-            aug.Normalize()
+            aug.Normalize(mean=mean, std=std)
         ])
         val_data = pascal_voc.VOCDataset(split='val', data_dir=args.data_dir, transform=val_transform)
 
 
-    net = pspnet.PSPNet(layers=cfg['layers'], nclass=cfg['num_class'], bins=cfg['bins'], zoom_factor=cfg['zoom_factor'])
-
-    if args.cuda:
-        net = torch.nn.DataParallel(net)
-        cudnn.benchmark = True
+    net = pspnet.PSPNet(layers=cfg['layers'], nclass=cfg['num_class'], bins=cfg['bins'], zoom_factor=cfg['zoom_factor'], pretrained=None)
+    print("Resnet-{} is built to predict {} class".format(cfg['layers'], cfg['num_class']))
 
     if args.resume:
         print('Resuming training, loading {} ...'.format(args.resume))
         net.load_weights(args.resume)
+    '''
     else:
-        base_weights = torch.load(args.save_folder + args.basenet)
+        base_weights = torch.load(args.basenet)
         print('Loading base network...')
-        net.load_state_dict(base_weights)
+        net.resnet.load_state_dict(base_weights)
+        print('Finished loading base net!')
+    
+
+    if not args.resume:
+        print('Initializing weights...')
+        # initialize newly added layers' weights with xavier method
+        net.ppm.apply(weights_init)
+        net.final.apply(weights_init)
+        net.aux.apply(weights_init)
+    '''
+    if args.cuda:
+        net = torch.nn.DataParallel(net)
+        cudnn.benchmark = True
 
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss(ignore_index=cfg['ignore_label'])
 
     net.train()
 
-    #loss counters
+    # loss counters
     main_loss = 0
     aux_loss = 0
     epoch = 0
@@ -134,6 +145,7 @@ def train():
     epoch_size = len(dataset) // args.batch_size
     print('Train PSPnet on : ', args.dataset)
     print('Epoch size is ', epoch_size)
+    print('initial LR is ', args.lr)
 
     step_index = 0
 
@@ -152,6 +164,7 @@ def train():
 
     # create batch iterator
     batch_iterator = iter(data_loader)
+    print(">>>>>> Begin training <<<<<<")
     for iteration in range(args.start_iter, max_iter):
         if iteration != 0 and (iteration % epoch_size == 0):
                         # reset epoch loss counters
@@ -159,12 +172,12 @@ def train():
             aux_loss = 0
             epoch += 1
             batch_iterator = iter(data_loader)
-            validation(net, val_loader, criterion)
+            #validation(net, val_loader, criterion)
 
         poly_learning_rate(optimizer, args.power, iteration, max_iter)
 
         try:
-            images, targets = next(batch_iterator)
+            images, label = next(batch_iterator)
         except StopIteration:
             batch_iterator = iter(data_loader)
             images, label = next(batch_iterator)
@@ -228,6 +241,7 @@ def validation(model, val_loader, criterion):
 
 def poly_learning_rate(optimizer, power, iter, max_iter):
     lr = args.lr * ((1 - (iter/max_iter)) ** power)
+    print("Current Learning Rate: ".format(lr))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
     #return lr

@@ -64,12 +64,13 @@ class VOCDataset(data.Dataset):
 
     def __getitem__(self, index):
         file_name = self.ids[index]
-        image_path = os.path.join(self.data_dir, "JPEGImages", "{}.jpg", file_name)
-        label_path = os.path.join(self.data_dir, "SegmentationClass", "{}.png", file_name)
+
+        image_path = os.path.join(self.data_dir, "JPEGImages", "{}.jpg".format(file_name))
+        label_path = os.path.join(self.data_dir, "SegmentationClass_aug", "{}.png".format(file_name))
 
         image = cv2.imread(image_path, cv2.IMREAD_COLOR)    # BGR ndarray H x W x C
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = np.float(image)
+        image = np.float32(image)
         label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)    # 1 channel Gray ndarray H x W
 
         if image.shape[0] != label.shape[0] or image.shape[1] != label.shape[1]:
@@ -83,3 +84,18 @@ class VOCDataset(data.Dataset):
     def __len__(self):
         return len(self.ids)
 
+
+if __name__ == '__main__':
+    import torch.utils.data as data
+    data_dir = 'E:\Code\VOC2012'
+    print("loading data from {}".format(data_dir))
+    dataset = VOCDataset(split='train', data_dir=data_dir)
+    data_loader = data.DataLoader(dataset, 2, num_workers=0, shuffle=True, pin_memory=True)
+    print("dataloader finished")
+    print(len(data_loader))
+    print(dataset.__len__())
+    print(data_loader.__len__())
+    img, label = dataset.__getitem__(index=0)
+    img = cv2.cvtColor(img/255, cv2.COLOR_RGB2BGR)
+    cv2.imshow('demo', img)
+    cv2.waitKey(0)

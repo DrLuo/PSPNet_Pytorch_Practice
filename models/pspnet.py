@@ -42,7 +42,7 @@ class PPM(nn.Module):
 
 '''pyramid sence parsing network'''
 class PSPNet(nn.Module):
-    def __init__(self, layers=50, nclass = 21, bins=(1,2,3,6), dropout=0.1, zoom_factor=8):
+    def __init__(self, layers=50, nclass = 21, bins=(1,2,3,6), dropout=0.1, zoom_factor=8, pretrained=None):
         super(PSPNet, self).__init__()
         assert layers in [18, 34, 50, 101, 152]
         assert zoom_factor in [1, 2, 4, 8]
@@ -67,6 +67,11 @@ class PSPNet(nn.Module):
         else:
             resnet = models.resnet152()
 
+        if pretrained is not None:
+            print("Loading pretrained model of resnet-{} from {}...".format(layers, pretrained))
+            resnet.load_state_dict(torch.load(pretrained), strict=False)
+            print("Loading successfully!")
+
         assert fea_dim % len(bins) == 0
 
         # 设置空洞卷积
@@ -86,7 +91,6 @@ class PSPNet(nn.Module):
 
 
         # Add PPM
-
         self.ppm = PPM(fea_dim, int(fea_dim/len(bins)), bins)
 
         # Add final Prediction
@@ -106,9 +110,7 @@ class PSPNet(nn.Module):
                 nn.Conv2d(256, nclass, kernel_size=1)
             )
 
-
-
-    def foward(self, x):
+    def forward(self, x):
         x_size = x.size()
         # zoom factor = 8
         assert  x_size[2] % 8 == 0 and x_size[3] % 8 == 0
@@ -142,5 +144,13 @@ class PSPNet(nn.Module):
 if __name__ == '__main__':
     print("PSPNet")
     net = PSPNet(layers=18, bins=(1,2,3,6))
-    net.train()
+    #pyramid = PPM(3, 10, bins=(1,2,3,6))
+    #print(pyramid)
+
+    net.eval()
     print(net)
+    input = torch.rand(2, 3, 224, 224)
+
+    output = net(input)
+    print("------------")
+    print('output', output.size())
