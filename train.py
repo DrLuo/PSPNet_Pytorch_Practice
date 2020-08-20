@@ -90,7 +90,7 @@ def train():
             aug.RandomHorizontalFlip(),
             aug.Crop([cfg['train_h'], cfg['train_w']], crop_type='rand', padding=mean, ignore_label=cfg['ignore_label']),
             aug.ToTensor(),
-            aug.Normalize()
+            aug.Normalize(mean=mean, std=std)
         ])
         dataset = pascal_voc.VOCDataset(split='train', data_dir=args.data_dir, transform=transform)
     elif args.dataset == 'ADE20K':
