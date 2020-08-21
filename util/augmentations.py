@@ -179,8 +179,9 @@ class Crop(object):
             if self.padding is None:
                 raise (RuntimeError("augmentation.Crop() need padding while padding argument is None\n"))
             image = cv2.copyMakeBorder(image, pad_h_half, pad_h-pad_h_half, pad_w_half, pad_w-pad_w_half, borderType=cv2.BORDER_CONSTANT, value=self.padding)
-            label = cv2.copyMakeBorder(image, pad_h_half, pad_h-pad_h_half, pad_w_half, pad_w-pad_w_half, borderType=cv2.BORDER_CONSTANT, value=self.ignore_label)
+            label = cv2.copyMakeBorder(label, pad_h_half, pad_h-pad_h_half, pad_w_half, pad_w-pad_w_half, borderType=cv2.BORDER_CONSTANT, value=self.ignore_label)
         # 裁剪
+        #print(label.shape)
         h, w = label.shape  #扩充后的图像尺寸
         if self.crop_type == 'random':
             h_off = random.randint(0, h - self.crop_h)

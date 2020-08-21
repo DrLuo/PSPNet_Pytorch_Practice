@@ -35,7 +35,7 @@ parser.add_argument('--basenet', default='E:/Code/pretrainedmodel/resnet/resnet5
                     help='Pretrained base model')
 parser.add_argument('--batch_size', default=4, type=int,
                     help='Batch size for training')
-parser.add_argument('--num_workers', default=4, type=int,
+parser.add_argument('--num_workers', default=0, type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
@@ -241,7 +241,8 @@ def validation(model, val_loader, criterion):
 
 def poly_learning_rate(optimizer, power, iter, max_iter):
     lr = args.lr * ((1 - (iter/max_iter)) ** power)
-    print("Current Learning Rate: ".format(lr))
+    if iter % 10 == 0:
+        print("Current Learning Rate: {}".format(lr))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
     #return lr
