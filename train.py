@@ -130,6 +130,7 @@ def train():
     if args.cuda:
         net = torch.nn.DataParallel(net)
         cudnn.benchmark = True
+        net = net.cuda()
 
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss(ignore_index=cfg['ignore_label'])

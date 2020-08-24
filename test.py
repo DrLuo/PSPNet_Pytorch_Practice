@@ -62,7 +62,7 @@ def test_VOC():
 
     value_scale = 255
     mean = cfg['mean']
-    std = cfg['cfg']
+    std = cfg['std']
     mean = [item * value_scale for item in mean]
     std = [item * value_scale for item in std]
 

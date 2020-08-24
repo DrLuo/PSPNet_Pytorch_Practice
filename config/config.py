@@ -16,6 +16,8 @@ cfg = {
     'resize_max': 2,
     'train_h': 224,
     'train_w': 224,
+    'test_h': 448,
+    'test_w': 448,
     'mean': [0.485, 0.456, 0.406],
     'std': [0.229, 0.224, 0.225],
     'batch_size_val': 8
