@@ -4,7 +4,7 @@ import argparse
 
 import numpy as np
 import cv2
-
+from PIL import Image
 from models import pspnet
 
 from data import pascal_voc
@@ -13,8 +13,10 @@ from config.config import cfg
 import collections
 import numbers
 # from util import augmentations as aug
-from util.utils import intersectionAndUnion, check_mkdir
+from util.utils import intersectionAndUnion, check_mkdir, colorize
 
+
+cv2.ocl.setUseOpenCL(False)
 
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
@@ -24,7 +26,7 @@ parser = argparse.ArgumentParser(
 demo_set = parser.add_mutually_exclusive_group()
 parser.add_argument('--img_path', default='E:\Code\PSPnet\image\demo.jpg',
                     help='The raw image for demo')
-parser.add_argument('--weight', default='weights/PSPNet_VOC.pth',
+parser.add_argument('--weight', default='PSPNet_VOC.pth',
                     help='Pretrained base model')
 parser.add_argument('--color_path', default='data/voc2012/voc2012_colors.txt',
                     help='path of dataset colors')
@@ -54,7 +56,7 @@ def main():
     std = cfg['std']
     mean = [item * value_scale for item in mean]
     std = [item * value_scale for item in std]
-    colors = np.loadtxt(args.colors_path).astype('uint8')
+    colors = np.loadtxt(args.color_path).astype('uint8')
     names = [line.rstrip('\n') for line in open(args.name_path)]
     print("Loading files finished!")
 
@@ -66,6 +68,7 @@ def main():
     image = crop(image)
     # cv2.imshow('raw', image)
     # cv2.waitKey(0)
+    print(image)
 
     h, w, _ = image.shape
     image = ToTensor(image)
@@ -86,10 +89,42 @@ def main():
     output = model(input)
     prediction = output.max(1)[1]
     #prediction = prediction.squeeze()
-    print(prediction.size())
-    map = prediction.cpu().numpy()
-    print(map)
+    # print(prediction.size())
+    # map = prediction.cpu().numpy()
+    prediction = prediction.cpu()
+
+    prediction = ToNumpy(prediction)
+    prediction = np.asarray(prediction)
+    gray = np.uint8(prediction)
+    #print(gray[0,0])
+
+    # print(prediction.size(0))
+    map = np.zeros((448,448,3))
+    map = np.uint8(map)
+    # print(map)
+    i = 0
+    j = 0
+    while i < 448:
+        j = 0
+        while j < 448:
+            index = gray[i,j,0]
+            pt = colors[index]
+            map[i,j] = pt
+            j=j+1
+        i=i+1
+    print("transfer finished")
+
+
+    # cv2.imshow('gary', gray)
+    # gray = Image.fromarray(np.uint8(gray)).convert('P')
+    #color = gray.putpalette(colors)
+    # color = colorize(gray, colors)
+    # seg = zeros()
+    # print(colors[0])
     #print(prediction)
+    cv2.imshow('seg', map)
+
+    cv2.waitKey(0)
 
 
 
@@ -108,6 +143,14 @@ def ToTensor(image):
     if not isinstance(image, torch.FloatTensor):
         image = image.float()
     return image
+
+
+def ToNumpy(image):
+    # Convert torch.FloatTensor (C x H x W) to numpy.ndarray (H x W x C)
+    image = image.numpy()
+    image = image.transpose((1,2,0))
+    return image
+
 
 
 def Normalize(image, mean, std):
