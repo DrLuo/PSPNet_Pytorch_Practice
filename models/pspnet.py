@@ -61,16 +61,17 @@ class PSPNet(nn.Module):
             fea_dim = 512
             mid_dim = 256
         elif layers == 50:
-            resnet = models.resnet50()
+            resnet = models.resnet50(pretrained=pretrained)
         elif layers == 101:
             resnet = models.resnet101()
         else:
             resnet = models.resnet152()
-
+        '''
         if pretrained is not None:
             print("Loading pretrained model of resnet-{} from {}...".format(layers, pretrained))
             resnet.load_state_dict(torch.load(pretrained), strict=False)
             print("Loading successfully!")
+        '''
 
         assert fea_dim % len(bins) == 0
 
@@ -113,7 +114,8 @@ class PSPNet(nn.Module):
     def forward(self, x):
         x_size = x.size()
         # zoom factor = 8
-        assert  x_size[2] % 8 == 0 and x_size[3] % 8 == 0
+        if self.training:
+            assert  x_size[2] % 8 == 0 and x_size[3] % 8 == 0
         h = x_size[2]
         w = x_size[3]
 
@@ -143,7 +145,7 @@ class PSPNet(nn.Module):
 
 if __name__ == '__main__':
     print("PSPNet")
-    net = PSPNet(layers=18, bins=(1,2,3,6))
+    net = PSPNet(layers=50, bins=(1,2,3,6))
     #pyramid = PPM(3, 10, bins=(1,2,3,6))
     #print(pyramid)
 

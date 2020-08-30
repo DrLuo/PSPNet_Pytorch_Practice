@@ -1,11 +1,12 @@
 import torch
+from torch.autograd import Variable
 import torchvision
 import argparse
 
 import numpy as np
 import cv2
 from PIL import Image
-from models import pspnet
+from models.pspnet import PSPNet
 
 from data import pascal_voc
 
@@ -24,10 +25,10 @@ def str2bool(v):
 parser = argparse.ArgumentParser(
     description='Pyramid Scene Parsing Application Demo')
 demo_set = parser.add_mutually_exclusive_group()
-parser.add_argument('--img_path', default='E:\Code\PSPnet\image\demo.jpg',
+parser.add_argument('--img_path', default='E:\Code\PSPnet\image\demo3.jpg',
                     help='The raw image for demo')
 parser.add_argument('--weight', default='PSPNet_VOC.pth',
-                    help='Pretrained base model')
+                    help='Trained base model')
 parser.add_argument('--color_path', default='data/voc2012/voc2012_colors.txt',
                     help='path of dataset colors')
 parser.add_argument('--name_path', default='data/voc2012/voc2012_names.txt',
@@ -60,15 +61,17 @@ def main():
     names = [line.rstrip('\n') for line in open(args.name_path)]
     print("Loading files finished!")
 
-    model = pspnet.PSPNet(layers=cfg['layers'], nclass=cfg['num_class'], bins=cfg['bins'], zoom_factor=cfg['zoom_factor'])
+    model = PSPNet(layers=cfg['layers'], nclass=cfg['num_class'], bins=cfg['bins'], zoom_factor=cfg['zoom_factor'], pretrained=False)
 
     image = cv2.imread(img_path, cv2.IMREAD_COLOR) # BGR 3 channel ndarray wiht shape H * W * 3
+
+    cv2.imshow('raw', image)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     crop = Crop((cfg['test_h'], cfg['test_w']), padding=mean)
-    image = crop(image)
+    # image = crop(image)
     # cv2.imshow('raw', image)
     # cv2.waitKey(0)
-    print(image)
+    # print(image)
 
     h, w, _ = image.shape
     image = ToTensor(image)
@@ -77,18 +80,22 @@ def main():
     print(input.size())
 
     if torch.cuda.is_available():
-        model = model.cuda()
+        model = torch.nn.DataParallel(model).cuda()
         input = input.cuda()
+    input = Variable(input)
     # model.train()
-    print('loading pretrained model from %s' % args.weight)
-    model.load_state_dict(torch.load(args.weight), strict=False)
-    print('loading pretrained model finished!')
+    print('=> loading pretrained model from %s' % args.weight)
+    #model.load_state_dict(torch.load(args.weight), strict=False)
+    checkpoint = torch.load(args.weight)
+
+    model.load_state_dict(checkpoint)
+    print('=> loading pretrained model finished!')
 
     # start inference
     model.eval()
     output = model(input)
     prediction = output.max(1)[1]
-    #prediction = prediction.squeeze()
+    # prediction = prediction.squeeze()
     # print(prediction.size())
     # map = prediction.cpu().numpy()
     prediction = prediction.cpu()
@@ -99,14 +106,14 @@ def main():
     #print(gray[0,0])
 
     # print(prediction.size(0))
-    map = np.zeros((448,448,3))
+    map = np.zeros((h,w,3))
     map = np.uint8(map)
     # print(map)
     i = 0
     j = 0
-    while i < 448:
+    while i < h:
         j = 0
-        while j < 448:
+        while j < w:
             index = gray[i,j,0]
             pt = colors[index]
             map[i,j] = pt

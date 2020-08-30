@@ -31,7 +31,9 @@ parser.add_argument('--dataset', default='VOC', choices=['VOC', 'ADE20K'],
 # TODO: Confirm the data dir and basenet
 parser.add_argument('--data_dir', default='E:\Code\VOC2012',
                     help='the Root Dir of your dataset')
-parser.add_argument('--basenet', default='E:/Code/pretrainedmodel/resnet/resnet50-19c8e357.pth',
+parser.add_argument('--pretrained', default=True, type=bool,
+                    help='using pretrained model of resnet or not')
+parser.add_argument('--basenet', default='E:/Code/pretrainedmodel/resnet/resnet_50v2.pth',
                     help='Pretrained base model')
 parser.add_argument('--batch_size', default=4, type=int,
                     help='Batch size for training')
@@ -106,7 +108,7 @@ def train():
         val_data = pascal_voc.VOCDataset(split='val', data_dir=args.data_dir, transform=val_transform)
 
 
-    net = pspnet.PSPNet(layers=cfg['layers'], nclass=cfg['num_class'], bins=cfg['bins'], zoom_factor=cfg['zoom_factor'], pretrained=None)
+    net = pspnet.PSPNet(layers=cfg['layers'], nclass=cfg['num_class'], bins=cfg['bins'], zoom_factor=cfg['zoom_factor'], pretrained=args.pretrained)
     print("Resnet-{} is built to predict {} class".format(cfg['layers'], cfg['num_class']))
 
     if args.resume:
