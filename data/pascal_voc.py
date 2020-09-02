@@ -29,7 +29,7 @@ def read_image_ids(image_sets_file):
 def extract_image_label(file_name, split='train', data_dir=None):
     #assert split in ['train', 'val', 'test']
     image_name = os.path.join(data_dir, "JPEGImages", "{}.jpg", file_name)
-    label_name = os.path.join(data_dir, "SegmentationClass", "{}.png", file_name)
+    label_name = os.path.join(data_dir, "SegmentationClassAug", "{}.png", file_name)
     return image_name, label_name
 
 
@@ -66,7 +66,7 @@ class VOCDataset(data.Dataset):
         file_name = self.ids[index]
 
         image_path = os.path.join(self.data_dir, "JPEGImages", "{}.jpg".format(file_name))
-        label_path = os.path.join(self.data_dir, "SegmentationClass_aug", "{}.png".format(file_name))
+        label_path = os.path.join(self.data_dir, "SegmentationClassAug", "{}.png".format(file_name))
 
         image = cv2.imread(image_path, cv2.IMREAD_COLOR)    # BGR ndarray H x W x C
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
